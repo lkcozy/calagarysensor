@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-module
+  type="WEB"
+  name="egeo_data_collect"
+  id="myeclipse.1373940407775"
+  context-root="/egeo_data_collect"
+  j2ee-spec="5.0"
+  archive="egeo_data_collect.war">
+  <attributes>
+    <attribute name="webrootdir" value="WebRoot" />
+  </attributes>
+</project-module>
+
