@@ -6,10 +6,13 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.eclipse.paho.client.mqttv3.IMqttActionListener;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
@@ -18,7 +21,11 @@ import org.springframework.stereotype.Controller;
 import com.nunknown.service.SensorService;
 import com.nunknown.util.ReadPropertiesUtil;
 import com.nunknown.util.Util;
-
+/**
+ * Use MQTT as data push mechanism
+ * @author Kan
+ *
+ */
 @Controller
 public class MQTTController implements MqttCallback 
 {
@@ -33,6 +40,8 @@ public class MQTTController implements MqttCallback
     private String broker       = "tcp://159.226.111.19:1883";
     private String clientId     = "calgaryserver";
     MqttMessage message = new MqttMessage();
+    
+    
 	public MQTTController() 
 	{
 		publishTopic = ReadPropertiesUtil.getPropertie("pTopic");
@@ -40,26 +49,48 @@ public class MQTTController implements MqttCallback
 		broker = ReadPropertiesUtil.getPropertie("brokerHost");
 		onConnect ();
 	}
-	
-	public void onConnect () {
-	    try {
-	    	clientId += 10000 *  Math.random();
+	/**
+	 * connet to MQTT server
+	 */
+	public void onConnect() 
+	{
+		IMqttActionListener conListener = new IMqttActionListener() 
+		{
+			public void onSuccess(IMqttToken asyncActionToken) 
+			{
+				try
+				{
+					LOG.info("Connected");
+					client.subscribe(subScribeTopic,0);
+					LOG.info("subscribe topic:" +subScribeTopic);
+				} catch (MqttException e)
+				{
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			public void onFailure(IMqttToken asyncActionToken, Throwable exception) 
+			{
+
+			}
+		};
+
+		try 
+		{
+			// Connect using a non-blocking connect
+			clientId += 10000 *  Math.random();
 	    	client = new MqttAsyncClient(broker, clientId);
 	        LOG.info("Connecting to broker: "+broker);
-	        client.connect();
-	        LOG.info("Connected");
+	     
 	        client.setCallback(this);
-	        if(client.isConnected())
-	        {
-	        	client.subscribe(subScribeTopic,0);
-	        }
-	        
-	    } catch (MqttException e) {
-	        e.printStackTrace();
-	        LOG.error(e.toString());
-	    }
+			client.connect("CalgaryServer", conListener);
+		} catch (MqttException e) {
+		}
 	}
-	
+	/**
+	 * publish certain topic
+	 * @param content
+	 */
 	public  void sendMessage(String content) 
 	{
 		message = new MqttMessage(content.getBytes());
@@ -81,6 +112,9 @@ public class MQTTController implements MqttCallback
 		LOG.info("connectionLost");
 	}
 	
+	/**
+	 * parse control command
+	 */
 	@Override
 	public void messageArrived(String topic, MqttMessage message)
 	        throws Exception 
@@ -113,7 +147,10 @@ public class MQTTController implements MqttCallback
 	{
 	    // TODO Auto-generated method stub
 	}
-	
+	/**
+	 * initialize all sensor's information
+	 * @return
+	 */
 	 public boolean initializeSensor() 
 	 {
 		 boolean result = true;
@@ -130,7 +167,11 @@ public class MQTTController implements MqttCallback
 		 }
 	        return result;
 	    }
-	    
+	    /**
+	     * stimulate all sensors' movement
+	     * @param start
+	     * @return
+	     */
 	    public String stimulate(String start) 
 	    { 
 	    	LOG.info("Initalize sensors");
@@ -169,7 +210,11 @@ public class MQTTController implements MqttCallback
 	    	}
 	         return status;
 	    }
-	    
+	    /**
+	     *  query sensor's information by id
+	     * @param id
+	     * @return
+	     */
 	    public String querySensorInfo(String id) 
 	    {
 	    	if(gs == null) initializeSensor();
