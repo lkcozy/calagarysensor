@@ -1,0 +1,9 @@
+host = '159.226.111.19';	// hostname or IP address
+port = 61614;
+topic = 'sensor';		// topic to subscribe to
+useTLS = false;
+username = null;
+password = null;
+// username = "jjolie";
+// password = "aa";
+cleansession = true;

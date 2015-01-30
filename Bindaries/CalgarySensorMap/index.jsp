@@ -10,6 +10,8 @@
     <script src="https://maps.googleapis.com/maps/api/js?v=3&amp;sensor=false"></script>
     <script type="text/javascript" src="js/markerclusterer.js"></script>
     <script type="text/javascript" src="js/infobox.js"></script>
+    <script type="text/javascript" src="js/mqtt/mqttws31.js"></script>
+    <script type="text/javascript" src="js/mqtt/config.js"></script>
     <script type="text/javascript">
     	// google map
         var map;
@@ -41,10 +43,8 @@
         function initialize() 
         {
           initMap();
-          //initBoundary();
           initInfoBox();
           initSensorTrack();
-          initSensors()
         }
       
         function initMap()
@@ -94,24 +94,9 @@
           for(var i = 0; i < SENSOR_NUM;i++)
           {
         	  sensorPath[i]=[];
-            //sensorPath[i] = new google.maps.Polyline(polyOptions);
-           // sensorPath[i].setMap(map);
-           
           }
        }
-       // request all sensors' information 
-       function initSensors()
-        {
-          $.ajax({
-           url:SERVER_HOST+'initializeSensor.do',
-           type:'post',
-           success:function(data)
-           {
-            getSensorInfo();
-           }
-          });
-        }
-    
+      
         //pop-up info window
         function markerClick(marker)
         {
@@ -138,42 +123,15 @@
          if($("#btnControl").val() == 'start')
          {
            $("#btnControl").val("stop");
-           stimulate('start');
-           getInfoTimer = setInterval("getSensorInfo()", REFRESH_RATE * 1000);
+           MQTTSend("start");
          }
          else
          {
            $("#btnControl").val("start");
-           stimulate('stop');
-           clearInterval(getInfoTimer);
+           MQTTSend("stop");
          }
        }
-		//start or stop stimulate
-       function stimulate(start)
-       {
-         $.ajax({
-             url:SERVER_HOST+'stimulate.do',
-             type:'post',
-             data:{start:start},
-             success:function(data)
-             {
-              getSensorInfo();
-             }
-          });
-       }
-       // query all sensors' information
-       function getSensorInfo()
-       {
-         $.ajax({
-             url:SERVER_HOST+'getSensorInfo.do',
-             type:'post',
-             success:function(data)
-             {
-              var dataobj = eval(data);
-              addSensorMarkers(dataobj);
-             }
-          });
-       }
+
        var poly;
        // parse json data and add markers 
       function addSensorMarkers(data)
@@ -280,11 +238,79 @@
     	        setTimeout(step, 1);
     	    }, keepAround);
       }
+	 //==================================================//
+	 // MQTT
+	 //==================================================//
+	 var mqtt;
+	 var publishTopic = "control";
+	 var subscribeTopic = "sensor";
+	 var reconnectTimeout = 2000;
+	 // connect to MQTT server
+	 function MQTTconnect() {
+		    mqtt = new Paho.MQTT.Client(
+		                    host,
+		                    port,
+		                    "calgary" + parseInt(Math.random() * 100,
+		                    10));
+		    var options = {
+		        timeout: 3,
+		        useSSL: useTLS,
+		        cleanSession: cleansession,
+		        onSuccess: onConnect,
+		        onFailure: function (message) {
+		        	console.log("Connection failed: " + message.errorMessage + "Retrying");
+		            setTimeout(MQTTconnect, reconnectTimeout);
+		        }
+		    };
+		
+		    mqtt.onConnectionLost = onConnectionLost;
+		    mqtt.onMessageArrived = onMessageArrived;
+		
+		    if (username != null) {
+		        options.userName = username;
+		        options.password = password;
+		    }
+		    console.log("Host="+ host + ", port=" + port + " TLS = " + useTLS + " username=" + username + " password=" + password);
+		    mqtt.connect(options);
+		}
+		// connect to MQTT server successfully 
+		function onConnect() 
+		{
+			initialize();
+			console.log('Connected to ' + host + ':' + port);
+		    // Connection succeeded; subscribe to our topic
+			mqtt.subscribe(subscribeTopic, {qos: 0});
+			console.log("subscribeTopic:"+subscribeTopic);
+		     // request all sensors' information 
+			MQTTSend("init");
+		}
+		// lost connection 
+		function onConnectionLost(response) 
+		{
+		    setTimeout(MQTTconnect, reconnectTimeout);
+		    //console.log("connection lost: " + responseObject.errorMessage + ". Reconnecting");
+		};
+	    // add sensosr when receiving data
+		function onMessageArrived(message) 
+		{
+		    var topic = message.destinationName;
+		    var dataobj = eval(message.payloadString);
+            addSensorMarkers(dataobj);
+		};
+		// send control message 
+		function MQTTSend(control)
+		{
+		    message = new Paho.MQTT.Message(control);
+		    message.destinationName = publishTopic;
+		    mqtt.send(message);  
+		    console.log("send topic:"+publishTopic + " " + control);    
+		}	
+	 
     </script>
 <script src="js/vendor/modernizr.js"></script>
 </head>
 
-<body onload="initialize();">
+<body onload="MQTTconnect();">
   <input id="btnControl" type="submit" value="start"
     onclick="javascript:control();" />
   <div id="map-container">

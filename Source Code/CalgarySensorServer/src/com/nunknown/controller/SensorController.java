@@ -21,7 +21,7 @@ public class SensorController extends BaseController
 	private final static Log LOG=LogFactory.getLog(SensorController.class);  
 	
     private static SensorService gs = SensorService.getInstance();
-    ScheduledExecutorService execService =  Executors.newScheduledThreadPool(3);;
+    ScheduledExecutorService execService =  Executors.newScheduledThreadPool(3);
     
     @ResponseBody
     @RequestMapping("/initializeSensor.do")
